@@ -1,9 +1,3 @@
-<<<<<<< HEAD
-pandas
-xlsxwriter
 streamlit
+pandas
 
-=======
-streamlit
-pandas
->>>>>>> 896e383 (Initial commit)
