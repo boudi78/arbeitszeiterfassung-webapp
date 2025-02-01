@@ -1,54 +1,180 @@
+import streamlit as st
 import pandas as pd
 from datetime import datetime, timedelta
 
-def generate_schedule():
-    start_date = datetime(2025, 1, 1)
-    end_date = datetime(2025, 12, 31)
-    dates = pd.date_range(start=start_date, end=end_date, freq='B')  # Nur Wochentage
-    
-    mitarbeiter = [f"Mitarbeiter {i}" for i in range(1, 11)]
-    data = []
-    
-    for date in dates:
-        for name in mitarbeiter:
-            entry = [
-                date.strftime("%Y-%m-%d"),
-                date.strftime("%A"),
-                name,
-                "08:00",
-                "17:00",
-                60,
-                "0",
-                "0",
-                "Nein",
-                "Nein"
-            ]
-            data.append(entry)
-    
-    df = pd.DataFrame(data, columns=[
-        "Datum", "Wochentag", "Name", "Startzeit", "Endzeit", "Pausenzeit (Min)",
-        "Gesamtarbeitszeit (Std)", "Überstunden (Std)", "Krank", "Urlaub"
+# --- Secure Login ---
+def login():
+    st.title("🔐 WorkTime Pro+ Login")
+    username = st.text_input("Username")
+    password = st.text_input("Password", type="password")
+
+    if username == "Teamsped" and password == "Beirut1578.":  # Change to your own credentials
+        st.success("✅ Login successful!")
+        return True
+    elif username and password:
+        st.error("❌ Incorrect credentials")
+    return False
+
+if not login():
+    st.stop()
+
+# --- Configuration ---
+STANDARD_HOURS = 8
+DEFAULT_HOURS = {"start": "08:00", "end": "17:00", "pause": 1.0}
+
+# --- Cached Functions ---
+@st.cache_data
+def generate_schedule(start_date, end_date, workers):
+    dates = pd.date_range(start_date, end_date)
+    return pd.DataFrame([
+        {
+            "Datum": date.date(),
+            "Mitarbeiter": worker,
+            "Startzeit": datetime.strptime(DEFAULT_HOURS["start"], "%H:%M").time(),
+            "Endzeit": datetime.strptime(DEFAULT_HOURS["end"], "%H:%M").time(),
+            "Pause": DEFAULT_HOURS["pause"],
+            "Krank": False,
+            "Urlaub": False
+        }
+        for date in dates
+        for worker in workers
     ])
-    return df
 
-def berechne_arbeitszeiten(df):
-    for index, row in df.iterrows():
-        try:
-            start_time = datetime.strptime(str(row["Startzeit"]), "%H:%M")
-            end_time = datetime.strptime(str(row["Endzeit"]), "%H:%M")
-            pause = int(row["Pausenzeit (Min)"])
-            arbeitszeit = (end_time - start_time).seconds / 3600 - (pause / 60)
-            df.at[index, "Gesamtarbeitszeit (Std)"] = round(arbeitszeit, 2)
-            df.at[index, "Überstunden (Std)"] = max(round(arbeitszeit - 8, 2), 0)
-        except Exception as e:
-            print(f"Fehler in Zeile {index + 1}: {e}")
-    return df
+@st.cache_data
+def calculate_hours(df):
+    try:
+        df["Datum"] = pd.to_datetime(df["Datum"])
+        df["Startzeit"] = pd.to_datetime(
+            df["Datum"].astype(str) + " " + df["Startzeit"].astype(str),
+            errors='coerce'
+        )
+        df["Endzeit"] = pd.to_datetime(
+            df["Datum"].astype(str) + " " + df["Endzeit"].astype(str),
+            errors='coerce'
+        )
 
-def speichern_excel(df, filename="Arbeitszeiterfassung_2025.xlsx"):
-    df.to_excel(filename, index=False, engine='xlsxwriter')  # Verwende xlsxwriter als Alternative zu openpyxl
-    print(f"Datei gespeichert: {filename}")
+        # Calculate Arbeitszeit and Überstunden
+        df["Arbeitszeit"] = (
+            (df["Endzeit"] - df["Startzeit"]).dt.total_seconds() / 3600 - df["Pause"]
+        )
+        df["Überstunden"] = (df["Arbeitszeit"] - STANDARD_HOURS).clip(lower=0)
 
-if __name__ == "__main__":
-    df = generate_schedule()
-    df = berechne_arbeitszeiten(df)
-    speichern_excel(df)
+        # Handle Krank and Urlaub
+        df["Arbeitszeit"] = df["Arbeitszeit"].where(~(df["Krank"] | df["Urlaub"]), 0)
+        df["Überstunden"] = df["Überstunden"].where(~(df["Krank"] | df["Urlaub"]), 0)
+
+        # Add additional columns for the year, quarter, and week
+        df["Woche"] = df["Datum"].dt.isocalendar().week
+        df["Quartal"] = df["Datum"].dt.to_period('Q').astype(str)
+        df["Jahr"] = df["Datum"].dt.year
+
+        return df
+    except Exception as e:
+        st.error(f"Calculation error: {str(e)}")
+        return df
+
+# --- Streamlit App ---
+st.set_page_config(page_title="WorkTime Pro+", layout="wide", page_icon="⏱️")
+st.title("⏱️ WorkTime Pro+ - Advanced Time Tracking")
+
+# ===== Sidebar Controls =====
+with st.sidebar:
+    st.header("Settings")
+    worker_names = st.text_input(
+        "🧑💼 Enter Worker Names (comma separated)",
+        "Max Mustermann, Anna Müller, Tom Schneider"
+    )
+    selected_workers = [name.strip() for name in worker_names.split(",") if name.strip()]
+
+    start_date = st.date_input("Start Date", datetime.today())
+    end_date = st.date_input("End Date", datetime.today() + timedelta(days=7))
+
+    if st.button("🔄 Generate Schedule"):
+        if not selected_workers:
+            st.error("Please enter worker names!")
+        elif start_date > end_date:
+            st.error("End date must be after start date!")
+        else:
+            with st.spinner("Generating..."):
+                try:
+                    st.session_state.df = generate_schedule(start_date, end_date, selected_workers)
+                    st.session_state.df = calculate_hours(st.session_state.df)
+                except Exception as e:
+                    st.error(f"Error: {str(e)}")
+
+# ===== Main Interface =====
+if "df" not in st.session_state or st.session_state.df.empty:
+    st.info("👉 Generate schedule first using sidebar controls")
+    st.stop()
+
+# Employee Search
+search_name = st.text_input("🔍 Search Employee by Name")
+if search_name:
+    mask = st.session_state.df['Mitarbeiter'].str.contains(search_name, case=False)
+    filtered_df = st.session_state.df[mask]
+else:
+    filtered_df = st.session_state.df
+
+# Data Editor
+edited_df = st.data_editor(
+    filtered_df,
+    column_config={
+        "Krank": st.column_config.CheckboxColumn("Sick"),
+        "Urlaub": st.column_config.CheckboxColumn("Vacation"),
+        "Startzeit": st.column_config.TimeColumn("Start"),
+        "Endzeit": st.column_config.TimeColumn("End"),
+        "Pause": st.column_config.NumberColumn("Break", format="%.1f"),
+        "Überstunden": st.column_config.NumberColumn("Overtime", format="%.1f", disabled=True)
+    },
+    hide_index=True,
+    use_container_width=True
+)
+
+# Update calculations
+if not edited_df.equals(filtered_df):
+    st.session_state.df.update(edited_df)
+    st.session_state.df = calculate_hours(st.session_state.df)
+    st.rerun()
+
+# ===== Visualizations =====
+st.subheader("Analysis Dashboard")
+
+col1, col2 = st.columns(2)
+with col1:
+    st.markdown("### Sick Days per Quarter")
+    sick_days = st.session_state.df.groupby(["Mitarbeiter", "Quartal"])["Krank"].sum().reset_index()
+    st.bar_chart(sick_days, x="Quartal", y="Krank", color="Mitarbeiter")
+
+with col2:
+    st.markdown("### Overtime Overview")
+    overtime = st.session_state.df.groupby("Mitarbeiter")["Überstunden"].sum().reset_index()
+    st.bar_chart(overtime, x="Mitarbeiter", y="Überstunden", color="Mitarbeiter")
+
+# ===== Yearly Report =====
+st.divider()
+if st.button("📅 Generate Annual Report"):
+    try:
+        report = st.session_state.df.groupby(["Jahr", "Mitarbeiter"]).agg({
+            "Arbeitszeit": "sum",
+            "Überstunden": "sum",
+            "Krank": "sum",
+            "Urlaub": "sum"
+        }).reset_index()
+
+        with pd.ExcelWriter("annual_report.xlsx") as writer:
+            report.to_excel(writer, sheet_name="Summary", index=False)
+            st.session_state.df.to_excel(writer, sheet_name="Details", index=False)
+
+        st.success("Report generated!")
+        st.download_button(
+            "⬇️ Download Report",
+            data=open("annual_report.xlsx", "rb").read(),
+            file_name="annual_work_report.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            use_container_width=True
+        )
+        st.dataframe(report)
+
+    except Exception as e:
+        st.error(f"Report error: {str(e)}")
+
