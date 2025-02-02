@@ -30,7 +30,13 @@ DEFAULT_HOURS = {"start": "08:00", "end": "17:00", "pause": 1.0}
 # --- Cached Functions ---
 @st.cache_data
 def generate_schedule(start_date, end_date, workers):
+    # Generate date range
     dates = pd.date_range(start_date, end_date)
+    
+    # Filter out weekends (Saturday=5, Sunday=6)
+    weekdays = [date for date in dates if date.weekday() < 5]  # Monday=0, Friday=4
+    
+    # Create schedule DataFrame
     return pd.DataFrame([
         {
             "Datum": date.date(),
@@ -41,7 +47,7 @@ def generate_schedule(start_date, end_date, workers):
             "Krank": False,
             "Urlaub": False
         }
-        for date in dates
+        for date in weekdays  # Use filtered weekdays
         for worker in workers
     ])
 
