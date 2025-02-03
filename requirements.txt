@@ -48,6 +48,8 @@ rpds-py==0.22.3
 rsa==4.9
 six==1.17.0
 smmap==5.0.2
+SQLAlchemy
+psycopg2-binary
 streamlit==1.29.0
 tenacity==8.5.0
 toml==0.10.2
@@ -60,3 +62,4 @@ validators==0.34.0
 watchdog==6.0.0
 XlsxWriter==3.2.2
 zipp==3.21.0
+

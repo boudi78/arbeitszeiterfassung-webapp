@@ -1,0 +1,12 @@
+# Ignore Windows system folders
+AppData/
+Desktop/
+Documents/
+Downloads/
+Favorites/
+Music/
+Pictures/
+Videos/
+NTUSER.*
+*.ini
+*.bat
