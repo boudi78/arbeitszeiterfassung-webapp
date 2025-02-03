@@ -12,6 +12,10 @@ gitdb==4.0.12
 GitPython==3.1.44
 google-auth==2.38.0
 google-auth-oauthlib==1.2.1
+ HEAD
+=======
+greenlet==3.1.1
+ e870195 (Add bcrypt to requirements.txt)
 gspread==6.1.4
 httplib2==0.22.0
 idna==3.10
@@ -31,6 +35,10 @@ packaging==23.2
 pandas==2.1.4
 pillow==10.4.0
 protobuf==4.25.6
+ HEAD
+=======
+psycopg2-binary==2.9.10
+e870195 (Add bcrypt to requirements.txt)
 pyarrow==19.0.0
 pyasn1==0.6.1
 pyasn1_modules==0.4.1
@@ -48,8 +56,12 @@ rpds-py==0.22.3
 rsa==4.9
 six==1.17.0
 smmap==5.0.2
+HEAD
 SQLAlchemy
 psycopg2-binary
+=======
+SQLAlchemy==2.0.37
+e870195 (Add bcrypt to requirements.txt)
 streamlit==1.29.0
 tenacity==8.5.0
 toml==0.10.2
