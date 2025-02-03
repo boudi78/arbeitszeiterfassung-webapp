@@ -1,0 +1,13 @@
+{
+  "type": "service_account",
+  "project_id": "arbeitzeit",
+  "private_key_id": "48f62f3b39fa80cabc325014b2f1b88d574523b0",
+  "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvwIBADANBgkqhkiG9w0BAQEFAASCBKkwggSlAgEAAoIBAQDmEFhf3qnw/76a\nkQ5QhjYrmOwIZHr/pAsPwyMeh2bO2RsGPIPiHh6wfRpbBQljDRN7jfcAeGIF4hUg\nuGzD3lZHiAJxIOhGEfsrXWeZNCMpCLYimCU3Dz1WtJNwSfSJf5lSJI8roH5Zelf5\nIC05QEmmkd0HoFuDQTUYOBYxq43uUZDNkGYvzq56phlHuEPa1C4DphR3KIV2mBMJ\n40tq4PNWrsSkXehnMb2NXLa0NHcDhMoauWMT0x6xCEZV6gGowyNIoTjkwp23gpSc\n67JCvaABHI5zxQRwRYlJtMDzO6SUeJSgrXB0zlZjwmqqieDnkQISrHtuq5qAKAAJ\nyOEsGcl9AgMBAAECggEAaQjAWDCflJwmCIo+J0xG8fuUkzZQo2Lg+/bCk18M9FXR\nTTUWnwbSSxAqlrCDexnOscN8J9ZOJlJ0A+a/HWNmL60sNDrqYIc4DTHNKPhRLxw/\njya4It2NywaRI5xYDOhY9tQjGy9gT/iXrnDexLsRhP8mEqPG8/MyytZcZ5vjpg/w\nb76zVXuvBgkoPBfDIiw4uMaxQTVLXW22uUIu6rd9lJB77loVQDVeo2L1Gif31hzn\n9M2ZnZVoY0J2IvDm8nZHsjgypM0UfLxnSu0fypZxYQlgSSEyeS8MPtqe0jDc/inf\nupmDn00hVfxOo5eNj5avqdwVArOb9eJUmtk6uIlCzwKBgQD3xngZGgZKr9Evwha2\nORz5bhWQgToAMGE4caJh1eKIWsl0Qp5b9p7XHFJ94pdl4T6xihbq9IwqysHLnvU3\nXOZKCWLfA0fP57BKGaOLJqflRk2OLt6UShWqcQGDLd5PYztLk003rdmRu460NRSo\nldS7UGy8fuWWrGp06iaQUNnlewKBgQDts15zfc56M/DQt0tgDe3RvbFjK64dWMnn\nmIhNYDeFvg6BxdT+S9rNR8pk7I5JV4UhugczJXecabSWZgHrnVXXj794kSDaKOHB\nfE0E72l2ivT6eO8DvK2sodK1cyB/fR19/iX7wd8nkECk4aE9RaGAo8iCrJqBmtCW\n1ujO5aDPZwKBgQD1haBKV2R2q8PgzDXPOccBT1llCPidaVNdKBUdV2ETdsr7PmxH\nepkpVTJU9azKUqnaKZjOF6exW5svl4Mr6g10vdpQXKLTXKVut/s8DwD+C20cgEsk\nrEjNzQ8PmusYxZ7jI8K3crkOVMlyvsqKx3W2a1pkamY8qPsQgVnXVZalcwKBgQDQ\n98KOR8iQuD76TlmufTBZFqnu5ESyug7uUrNpSrAlHLvGLLSeRvN5SqbM6QYBxjZd\nOxz/Qu4PjQJcwhroFy6TTmVmyjeWcyBdKDjRoOQXefv6gvylTWdlf/Is4KRuUADw\nddDQrlTPhErAaTeGFUPxQouRDcrbK846/X43/bnM+wKBgQC7Za+iRvxmOrZ9qSme\nOWm3q8KO2lcnKUSs3xjDMQN2iSAYOn1C0OAMD6+KtghnnnNDwYPEGhBzYgf2bY2N\nwlf5mrlo85KO2hfLAa/s3MLEjj52uNIxITeSkHFIkwc4mPJmsI0J0RK0Npq48YfN\nDBbWoFr1rkNdlrv75yA6UZebLA==\n-----END PRIVATE KEY-----\n",
+  "client_email": "streamlit-app-service-acco-301@arbeitzeit.iam.gserviceaccount.com",
+  "client_id": "113544464427244053409",
+  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+  "token_uri": "https://oauth2.googleapis.com/token",
+  "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+  "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/streamlit-app-service-acco-301%40arbeitzeit.iam.gserviceaccount.com",
+  "universe_domain": "googleapis.com"
+}

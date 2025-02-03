@@ -1,75 +1,92 @@
-
-
 import streamlit as st
 import pandas as pd
 from datetime import datetime, timedelta
 import os
-import sqlite3
+from sqlalchemy import create_engine, Column, Integer, String, DateTime
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker
 import bcrypt
 
-# --- Datenbankfunktionen ---
-DB_NAME = "users.db"
+# ------------------------------
+# Database Setup with PostgreSQL
+# ------------------------------
+# The DATABASE_URL should be provided by Render as an environment variable.
+# Format: postgresql://user:password@host:port/dbname
+DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://user:password@localhost/dbname")
 
-def get_db_connection():
-    conn = sqlite3.connect(DB_NAME, check_same_thread=False)
-    conn.row_factory = sqlite3.Row
-    return conn
+# Create SQLAlchemy engine and session
+engine = create_engine(DATABASE_URL)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+Base = declarative_base()
 
+# Define the User model
+class User(Base):
+    __tablename__ = "users"
+    id = Column(Integer, primary_key=True, index=True)
+    username = Column(String, unique=True, index=True, nullable=False)
+    email = Column(String, unique=True, index=True, nullable=False)
+    password_hash = Column(String, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+# Create tables if they do not exist
 def init_db():
-    conn = get_db_connection()
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            username TEXT UNIQUE NOT NULL,
-            email TEXT UNIQUE NOT NULL,
-            password_hash TEXT NOT NULL,
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-        )
-    """)
-    conn.commit()
-    conn.close()
+    Base.metadata.create_all(bind=engine)
 
+# Add a new user to the PostgreSQL database
 def add_user(username, email, password):
-    conn = get_db_connection()
-    password_hash = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
+    db = SessionLocal()
+    # Hash the password and decode to store as a string
+    password_hash = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+    new_user = User(username=username, email=email, password_hash=password_hash)
     try:
-        conn.execute(
-            "INSERT INTO users (username, email, password_hash) VALUES (?, ?, ?)",
-            (username, email, password_hash)
-        )
-        conn.commit()
+        db.add(new_user)
+        db.commit()
         st.success("Signup successful! You can now log in.")
-    except sqlite3.IntegrityError:
-        st.error("Username or email already exists.")
+    except Exception as e:
+        db.rollback()
+        st.error(f"Error inserting user: {e}")
     finally:
-        conn.close()
+        db.close()
 
+# Retrieve a user by username
 def get_user(username):
-    conn = get_db_connection()
-    user = conn.execute("SELECT * FROM users WHERE username = ?", (username,)).fetchone()
-    conn.close()
+    db = SessionLocal()
+    user = db.query(User).filter(User.username == username).first()
+    db.close()
     return user
 
+# Update a user's password
 def update_password(username, new_password):
-    conn = get_db_connection()
-    password_hash = bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt())
-    conn.execute("UPDATE users SET password_hash = ? WHERE username = ?", (password_hash, username))
-    conn.commit()
-    conn.close()
-    st.success("Password updated successfully!")
+    db = SessionLocal()
+    password_hash = bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+    try:
+        user = db.query(User).filter(User.username == username).first()
+        if user:
+            user.password_hash = password_hash
+            db.commit()
+            st.success("Password updated successfully!")
+        else:
+            st.error("User not found.")
+    except Exception as e:
+        db.rollback()
+        st.error(f"Error updating password: {e}")
+    finally:
+        db.close()
 
-# --- Initialisiere die Datenbank ---
+# Initialize the database on app start
 init_db()
 
-# --- Seiten-Navigation für Auth ---
+# ------------------------------
+# Streamlit App: Navigation & Pages
+# ------------------------------
 if "page" not in st.session_state:
-    st.session_state.page = "login"  # Default page
+    st.session_state.page = "login"  # Default to login page
 
 def switch_page(page_name):
     st.session_state.page = page_name
     st.experimental_rerun()
 
-# --- Login Seite ---
+# --- Authentication Pages ---
 def login_page():
     st.title("🔐 WorkTime Pro+ Login")
     username = st.text_input("Username", key="login_username")
@@ -77,7 +94,8 @@ def login_page():
     
     if st.button("Login"):
         user = get_user(username)
-        if user and bcrypt.checkpw(password.encode('utf-8'), user["password_hash"]):
+        # Ensure stored password is compared as string
+        if user and bcrypt.checkpw(password.encode('utf-8'), user.password_hash.encode('utf-8')):
             st.success("✅ Login successful!")
             st.session_state.logged_in = True
             st.session_state.current_user = username
@@ -93,7 +111,6 @@ def login_page():
     if st.button("Forgot Password?", key="to_forgot"):
         switch_page("forgot_password")
 
-# --- Signup Seite ---
 def signup_page():
     st.title("📝 Signup")
     new_username = st.text_input("Choose a Username", key="signup_username")
@@ -110,7 +127,6 @@ def signup_page():
     if st.button("Back to Login", key="back_to_login_from_signup"):
         switch_page("login")
 
-# --- Forgot Password Seite ---
 def forgot_password_page():
     st.title("🔑 Reset Password")
     username = st.text_input("Enter your Username", key="forgot_username")
@@ -120,7 +136,8 @@ def forgot_password_page():
     
     if st.button("Reset Password"):
         user = get_user(username)
-        if user and user["email"] == email:
+        # Access email from the SQLAlchemy model
+        if user and user.email == email:
             if new_password != confirm_new_password:
                 st.error("Passwords do not match!")
             else:
@@ -133,26 +150,14 @@ def forgot_password_page():
     if st.button("Back to Login", key="back_to_login_from_forgot"):
         switch_page("login")
 
-# --- Auth-Seiten Auswahl ---
-if "logged_in" not in st.session_state:
-    st.session_state.logged_in = False
-
-if st.session_state.page == "login":
-    login_page()
-elif st.session_state.page == "signup":
-    signup_page()
-elif st.session_state.page == "forgot_password":
-    forgot_password_page()
-elif st.session_state.page == "app" and not st.session_state.get("logged_in", False):
-    # Falls der User noch nicht eingeloggt ist, zurück zur Login-Seite
-    switch_page("login")
-
-# --- Hauptanwendung (nach dem Login) ---
-if st.session_state.get("logged_in", False) and st.session_state.page == "app":
-    # Set page configuration (bereits oben gesetzt)
+# ------------------------------
+# Main Application Page (After Login)
+# ------------------------------
+def main_app():
     st.title("⏱️ WorkTime Pro+ - Advanced Time Tracking")
     
-    # --- Persistenz der Arbeitsplandaten ---
+    # For demo purposes: using a CSV file to save the schedule.
+    # (For production, you might use a separate persistent store.)
     SCHEDULE_FILE = "schedule.csv"
     
     def load_schedule():
@@ -170,11 +175,11 @@ if st.session_state.get("logged_in", False) and st.session_state.page == "app":
             st.success("Schedule saved!")
         except Exception as e:
             st.error(f"Error saving schedule: {e}")
-
-    # --- Configuration und Funktionen ---
+    
+    # Schedule configuration
     STANDARD_HOURS = 8
     DEFAULT_HOURS = {"start": "08:00", "end": "17:00", "pause": 1.0}
-
+    
     @st.cache_data
     def generate_schedule(start_date, end_date, workers):
         dates = pd.date_range(start_date, end_date)
@@ -191,7 +196,7 @@ if st.session_state.get("logged_in", False) and st.session_state.page == "app":
             for date in dates
             for worker in workers
         ])
-
+    
     @st.cache_data
     def calculate_hours(df):
         try:
@@ -204,36 +209,29 @@ if st.session_state.get("logged_in", False) and st.session_state.page == "app":
                 df["Datum"].astype(str) + " " + df["Endzeit"].astype(str),
                 errors='coerce'
             )
-
-            # Berechnung der Arbeitszeit und Überstunden
-            df["Arbeitszeit"] = (
-                (df["Endzeit"] - df["Startzeit"]).dt.total_seconds() / 3600 - df["Pause"]
-            )
+    
+            df["Arbeitszeit"] = ((df["Endzeit"] - df["Startzeit"]).dt.total_seconds() / 3600) - df["Pause"]
             df["Überstunden"] = (df["Arbeitszeit"] - STANDARD_HOURS).clip(lower=0)
-
-            # Falls Krank oder Urlaub, keine Arbeitszeit
+    
             df["Arbeitszeit"] = df["Arbeitszeit"].where(~(df["Krank"] | df["Urlaub"]), 0)
             df["Überstunden"] = df["Überstunden"].where(~(df["Krank"] | df["Urlaub"]), 0)
-
-            # Zusätzliche Spalten für Jahr, Quartal und Woche
+    
             df["Woche"] = df["Datum"].dt.isocalendar().week
             df["Quartal"] = df["Datum"].dt.to_period('Q').astype(str)
             df["Jahr"] = df["Datum"].dt.year
-
+    
             return df
         except Exception as e:
-            st.error(f"Calculation error: {str(e)}")
+            st.error(f"Calculation error: {e}")
             return df
-
-    # Lade evtl. einen zuvor gespeicherten Plan
+    
     if "df" not in st.session_state:
         loaded_df = load_schedule()
         if loaded_df is not None:
             st.session_state.df = loaded_df
         else:
-            st.session_state.df = pd.DataFrame()  # Leere DataFrame
-
-    # ===== Sidebar Controls =====
+            st.session_state.df = pd.DataFrame()
+    
     with st.sidebar:
         st.header("Settings")
         worker_names = st.text_input(
@@ -241,10 +239,10 @@ if st.session_state.get("logged_in", False) and st.session_state.page == "app":
             "Max Mustermann, Anna Müller, Tom Schneider"
         )
         selected_workers = [name.strip() for name in worker_names.split(",") if name.strip()]
-
+    
         start_date = st.date_input("Start Date", datetime.today())
         end_date = st.date_input("End Date", datetime.today() + timedelta(days=7))
-
+    
         if st.button("🔄 Generate Schedule"):
             if not selected_workers:
                 st.error("Please enter worker names!")
@@ -256,32 +254,29 @@ if st.session_state.get("logged_in", False) and st.session_state.page == "app":
                         st.session_state.df = generate_schedule(start_date, end_date, selected_workers)
                         st.session_state.df = calculate_hours(st.session_state.df)
                     except Exception as e:
-                        st.error(f"Error: {str(e)}")
-
+                        st.error(f"Error: {e}")
+    
         if st.button("💾 Save Schedule"):
             if "df" in st.session_state and not st.session_state.df.empty:
                 save_schedule(st.session_state.df)
             else:
                 st.warning("No schedule to save!")
-
+    
         if st.button("🚪 Logout"):
-            st.session_state.clear()  # Alle session_state Variablen löschen
-            st.experimental_rerun()  # App neu laden
-
-    # ===== Main Interface =====
+            st.session_state.clear()
+            st.experimental_rerun()
+    
     if st.session_state.df.empty:
         st.info("👉 Generate schedule first using sidebar controls")
         st.stop()
-
-    # Employee Search
+    
     search_name = st.text_input("🔍 Search Employee by Name")
     if search_name:
         mask = st.session_state.df['Mitarbeiter'].str.contains(search_name, case=False)
         filtered_df = st.session_state.df[mask]
     else:
         filtered_df = st.session_state.df
-
-    # Data Editor
+    
     edited_df = st.data_editor(
         filtered_df,
         column_config={
@@ -295,14 +290,12 @@ if st.session_state.get("logged_in", False) and st.session_state.page == "app":
         hide_index=True,
         use_container_width=True
     )
-
-    # Update calculations
+    
     if not edited_df.equals(filtered_df):
         st.session_state.df.update(edited_df)
         st.session_state.df = calculate_hours(st.session_state.df)
         st.experimental_rerun()
-
-    # ===== Visualizations =====
+    
     st.subheader("Analysis Dashboard")
     col1, col2 = st.columns(2)
     with col1:
@@ -313,8 +306,7 @@ if st.session_state.get("logged_in", False) and st.session_state.page == "app":
         st.markdown("### Overtime Overview")
         overtime = st.session_state.df.groupby("Mitarbeiter")["Überstunden"].sum().reset_index()
         st.bar_chart(overtime, x="Mitarbeiter", y="Überstunden", use_container_width=True)
-
-    # ===== Yearly Report =====
+    
     st.divider()
     if st.button("📅 Generate Annual Report"):
         with st.spinner("Generating report..."):
@@ -325,11 +317,11 @@ if st.session_state.get("logged_in", False) and st.session_state.page == "app":
                     "Krank": "sum",
                     "Urlaub": "sum"
                 }).reset_index()
-
+    
                 with pd.ExcelWriter("annual_report.xlsx") as writer:
                     report.to_excel(writer, sheet_name="Summary", index=False)
                     st.session_state.df.to_excel(writer, sheet_name="Details", index=False)
-
+    
                 st.success("Report generated!")
                 st.download_button(
                     "⬇️ Download Report",
@@ -339,6 +331,21 @@ if st.session_state.get("logged_in", False) and st.session_state.page == "app":
                     use_container_width=True
                 )
                 st.dataframe(report)
-
+    
             except Exception as e:
-                st.error(f"Report error: {str(e)}")
+                st.error(f"Report error: {e}")
+
+# ------------------------------
+# Page Routing Based on Session State
+# ------------------------------
+if st.session_state.page == "login":
+    login_page()
+elif st.session_state.page == "signup":
+    signup_page()
+elif st.session_state.page == "forgot_password":
+    forgot_password_page()
+elif st.session_state.page == "app":
+    if st.session_state.get("logged_in", False):
+        main_app()
+    else:
+        switch_page("login")
